@@ -1,0 +1,234 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catch the Ball Game - Pro</title>
+<style>
+  body {
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+    background: linear-gradient(to bottom, #1a2a6c, #b21f1f, #fdbb2d);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+    flex-direction: column;
+  }
+
+  #gameContainer {
+    position: relative;
+  }
+
+  canvas {
+    border-radius: 20px;
+    background-color: #1e1e2f;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
+
+  #score {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 32px;
+    font-weight: bold;
+    text-shadow: 2px 2px 10px rgba(0,0,0,0.8);
+    z-index: 2;
+  }
+
+  .control-buttons {
+    margin-top: 20px;
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+  }
+
+  .control-buttons button {
+    width: 90px;
+    height: 60px;
+    font-size: 30px;
+    font-weight: bold;
+    border: none;
+    border-radius: 15px;
+    background-color: #1dd1a1;
+    color: #fff;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  #startBtn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px;
+    height: 70px;
+    font-size: 28px;
+    font-weight: bold;
+    background-color: #ff6b6b;
+    color: white;
+    border: none;
+    border-radius: 25px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    cursor: pointer;
+    z-index: 3;
+  }
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+  <div id="score">Score: 0</div>
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+  <button id="startBtn">START GAME</button>
+</div>
+
+<div class="control-buttons">
+  <button id="leftBtn">⏴</button>
+  <button id="rightBtn">⏵</button>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let score = 0;
+let gameStarted = false;
+let ballSpeed = 6; // Pehle se jyada speed
+
+// Audio Function (No external file needed)
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playCatchSound() {
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.type = 'square'; 
+  oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // Sound pitch
+  gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  
+  oscillator.start();
+  oscillator.stop(audioCtx.currentTime + 0.1); // Short beep
+}
+
+const platform = {
+  x: canvas.width / 2 - 50,
+  y: canvas.height - 40,
+  width: 110,
+  height: 15,
+  speed: 8
+};
+
+let ball = {
+  x: Math.random() * (canvas.width - 30) + 15,
+  y: 0,
+  radius: 12,
+  dy: ballSpeed,
+  color: '#ff4757'
+};
+
+let leftPressed = false;
+let rightPressed = false;
+
+// Controls
+const setLeft = (val) => leftPressed = val;
+const setRight = (val) => rightPressed = val;
+
+document.getElementById('leftBtn').addEventListener('mousedown', () => setLeft(true));
+document.getElementById('leftBtn').addEventListener('mouseup', () => setLeft(false));
+document.getElementById('leftBtn').addEventListener('touchstart', (e) => { setLeft(true); e.preventDefault(); });
+document.getElementById('leftBtn').addEventListener('touchend', (e) => { setLeft(false); e.preventDefault(); });
+
+document.getElementById('rightBtn').addEventListener('mousedown', () => setRight(true));
+document.getElementById('rightBtn').addEventListener('mouseup', () => setRight(false));
+document.getElementById('rightBtn').addEventListener('touchstart', (e) => { setRight(true); e.preventDefault(); });
+document.getElementById('rightBtn').addEventListener('touchend', (e) => { setRight(false); e.preventDefault(); });
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  gameStarted = true;
+  score = 0;
+  ballSpeed = 6; // Reset speed
+  document.getElementById('score').innerText = 'Score: 0';
+  document.getElementById('startBtn').style.display = 'none';
+  resetBall();
+  update();
+});
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw Platform
+  ctx.fillStyle = '#1dd1a1';
+  ctx.shadowBlur = 15;
+  ctx.shadowColor = '#1dd1a1';
+  ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+
+  // Draw Ball
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+  ctx.fillStyle = ball.color;
+  ctx.shadowColor = ball.color;
+  ctx.fill();
+  ctx.closePath();
+}
+
+function update() {
+  if(!gameStarted) return;
+
+  // Platform Move
+  if(leftPressed && platform.x > 0) platform.x -= platform.speed;
+  if(rightPressed && platform.x < canvas.width - platform.width) platform.x += platform.speed;
+
+  // Ball Move
+  ball.y += ball.dy;
+
+  // Collision Detection (Catching the ball)
+  if(ball.y + ball.radius >= platform.y && 
+     ball.x > platform.x && 
+     ball.x < platform.x + platform.width) {
+    
+    score++;
+    playCatchSound(); // Awaaz bajegi
+    document.getElementById('score').innerText = 'Score: ' + score;
+    
+    ballSpeed += 0.3; // Har catch ke baad speed badhegi
+    resetBall();
+  }
+
+  // Game Over
+  if(ball.y > canvas.height) {
+    alert('Game Over! Final Score: ' + score);
+    gameStarted = false;
+    document.getElementById('startBtn').style.display = 'block';
+    return;
+  }
+
+  draw();
+  requestAnimationFrame(update);
+}
+
+function resetBall() {
+  ball.x = Math.random() * (canvas.width - 30) + 15;
+  ball.y = -20;
+  ball.dy = ballSpeed;
+  // Random color for ball
+  const colors = ['#ff4757', '#eccc68', '#70a1ff', '#ffffff'];
+  ball.color = colors[Math.floor(Math.random() * colors.length)];
+}
+
+// Initial draw
+ctx.fillStyle = '#fff';
+ctx.font = '20px Roboto';
+ctx.textAlign = 'center';
+ctx.fillText('Tap START to Play', canvas.width/2, canvas.height/2);
+
+</script>
+</body>
+</html>
